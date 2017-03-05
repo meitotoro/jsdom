@@ -289,7 +289,7 @@ function focusLabels() {
     }
 }
 function resetFields(whichform) {
-    if (Modernizr.input.placeholder) return;
+    //if (Modernizr.input.placeholder) return;
     for (var i = 0; i < whichform.elements.length; i++) {
         var element = whichform.elements[i];
         if (element.type == "submit") continue;
@@ -311,18 +311,9 @@ function resetFields(whichform) {
         element.onblur();
     }
 }
-function prepareForms() {
-    for (var i = 0; i < document.forms.length; i++) {
-        var thisform = document.forms[i];
-        resetFields(thisform);
-        thisform.onsubmit = function () {
-            return validationForm(this);
-        }
-    }
-}
+
 function isFilled(field) {
-    if (field.value.replace(" ", "").length == 0)
-        return false;
+    if (field.value.replace(" ", "").length == 0) return false;
     var placeholder = field.placeholder || field.getAttribute("placeholder");
     return (field.value != placeholder);
 }
@@ -332,14 +323,12 @@ function isEmail(field) {
 function validationForm(whichform) {
     for (var i = 0; i < whichform.elements.length; i++) {
         var element = whichform.elements[i];
-        //if (element.required == 'required') {
-        if (element.type == "text") {
+        if (element.required == 'required') {
             if (!isFilled(element)) {
                 alert("please fill in the " + element.name + " field.");
                 return false;
             }
         }
-        //}
         if (element.type == "email") {
             if (!isEmail(element)) {
                 alert("The " + element.name + " field must be a valid email adress.");
@@ -348,6 +337,72 @@ function validationForm(whichform) {
         }
     }
     return true;
+}
+function getHTTPObject() {
+    if(typeof XMLHttpRequest=="undefined")
+        XMLHttpRequest = function () {
+            try{
+                return new ActiveXObject("Msxml2.XMLHTTP.6.0");
+            } catch (e) {}
+            try{
+                return new ActiveXObject("Msxml2.XMLHTTP.3.0");
+            } catch (e) { }
+            try{return new ActiveXObject("Msxml2.XMLHTTP");}
+            catch (e) { }
+            return false;
+        }
+    return new XMLHttpRequest();
+}
+function displayAjaxLoading(element) {
+    while (element.hasChildNodes()) {
+        element.removeChild(element.lastChild);
+    }
+    var content = document.createElement("img");
+    content.setAttribute("src", "images/loading.gif");
+    content.setAttribute("alt", "Loading...");
+    element.appendChild(content);
+}
+function submitFormWithAjax(whichform, thetarget) {
+    var request = getHTTPObject();
+    if (!request) return false;
+    displayAjaxLoading(thetarget);
+    var dataparts = [];
+    var element;
+    for (var i = 0; i < whichform.elements.length; i++) {
+        element = whichform.elements[i];
+        dataparts[i] = element.name + "=" + encodeURIComponent(element.value);
+    }
+    var data = dataparts.join("&");
+    request.open('POST', whichform.getAttribute("action"), true);
+    request.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+    request.onreadystatechange = function () {
+        if (request.readyState == 4) {
+            if (request.status == 200) {
+                var matches = request.responseText.match(/<article>([\s\S]+)<\/article>/);
+                if (matches.length > 0) {
+                    thetarget.innerHTML = matches[1];
+                } else {
+                    thetarget.innerHTML = "<p>Oops, there was an error. Sorry. </p>";
+                }
+            } else {
+                thetarget.innerHTML = "<p>" + request.statusText + "<p>";
+            }
+        }
+    };
+    request.send(data);
+    return true;
+}
+function prepareForms() {
+    for (var i = 0; i < document.forms.length; i++) {
+        var thisform = document.forms[i];
+        resetFields(thisform);
+        thisform.onsubmit = function () {
+            if (!validationForm(this)) return false;
+            var article = document.getElementsByTagName('article')[0];
+            if (submitFormWithAjax(this, article)) return false;
+            return true;
+        }
+    }
 }
 addLoadEvent(highlightPage);
 addLoadEvent(prepareSlideshow);
